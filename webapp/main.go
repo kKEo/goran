@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kkEo/g-mk8s/webapp/middleware"
 )
 
 func main() {
@@ -18,7 +19,10 @@ func main() {
 		})
 	})
 
-	router.GET("/greet/:name", func(c *gin.Context) {
+	protected := router.Group("/protected")
+	protected.Use(middleware.AuthMiddleware())
+
+	protected.GET("/greet/:name", func(c *gin.Context) {
 		name := c.Param("name")
 		c.JSON(http.StatusOK, gin.H{
 			"message": fmt.Sprintf("Hello, %s", name),
