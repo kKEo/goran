@@ -1,21 +1,32 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, world!"))
+
+	router := gin.Default()
+
+	router.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Hello, world!",
+		})
+	})
+
+	router.GET("/greet/:name", func(c *gin.Context) {
+		name := c.Param("name")
+		c.JSON(http.StatusOK, gin.H{
+			"message": fmt.Sprintf("Hello, %s", name),
+		})
 	})
 
 	log.Println("Starting server on :8080")
 
-	err := http.ListenAndServe(":8080", nil)
-
-	if err != nil {
-		log.Fatal("Starting server failure: ", err)
-	}
+	router.Run(":8080")
 
 }
