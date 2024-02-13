@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -9,7 +8,6 @@ import (
 	"github.com/kkEo/g-mk8s/webapp/api"
 	"github.com/kkEo/g-mk8s/webapp/db"
 	"github.com/kkEo/g-mk8s/webapp/middleware"
-	"github.com/kkEo/g-mk8s/webapp/model"
 )
 
 func main() {
@@ -34,6 +32,10 @@ func main() {
 	userApiHandlers := &api.UserHandlers{DB: database}
 	router.GET("/users/:name", userApiHandlers.GetUser)
 	protected.POST("/users", userApiHandlers.PostUser)
+
+	tokenApiHandlers := &api.TokenHandlers{DB: database}
+	protected.POST("/tokens", tokenApiHandlers.PostToken)
+	protected.GET("/users/:name/tokens", tokenApiHandlers.GetTokens)
 
 	log.Println("Starting server on :8080")
 	router.Run(":8080")
