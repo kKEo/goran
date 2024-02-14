@@ -10,34 +10,36 @@ import (
 	"github.com/kkEo/g-mk8s/webapp/middleware"
 )
 
-func main() {
-
-	router := gin.Default()
+func SetupApp() *gin.Engine {
+	app := gin.Default()
 
 	log.Println("Init database")
-
 	database := db.Init()
 
 	log.Println("Database initialized")
-
-	router.GET("/", func(c *gin.Context) {
+	app.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Hello, world!",
 		})
 	})
 
-	protected := router.Group("/protected")
-	protected.Use(middleware.AuthMiddleware())
+	protected := app.Group("/protected")
+	authMidleware := middleware.AuthMiddleware{DB: database}
+	protected.Use(authMidleware.Handle())
 
 	userApiHandlers := &api.UserHandlers{DB: database}
-	router.GET("/users/:name", userApiHandlers.GetUser)
+	app.GET("/users/:name", userApiHandlers.GetUser)
 	protected.POST("/users", userApiHandlers.PostUser)
 
 	tokenApiHandlers := &api.TokenHandlers{DB: database}
 	protected.POST("/tokens", tokenApiHandlers.PostToken)
 	protected.GET("/users/:name/tokens", tokenApiHandlers.GetTokens)
 
-	log.Println("Starting server on :8080")
-	router.Run(":8080")
+	return app
+}
 
+func main() {
+	app := SetupApp()
+	log.Println("Starting server on :8080")
+	app.Run(":8080")
 }
