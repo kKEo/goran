@@ -33,6 +33,14 @@ func SetupApp() *gin.Engine {
 	protected.POST("/tokens", tokenApiHandlers.PostToken)
 	protected.GET("/users/:name/tokens", tokenApiHandlers.GetTokens)
 
+	// TODO: Introduce common user ownership
+	// protectedUserOwned := protected.Group("users/:user")
+
+	blueprintHandlers := &api.BlueprintHandlers{DB: database}
+	protected.POST("/blueprints", blueprintHandlers.PostBlueprint)
+	protected.PUT("/blueprints", blueprintHandlers.PutBlueprint)
+	protected.GET("/blueprints/:name", blueprintHandlers.GetBlueprint)
+
 	return app
 }
 

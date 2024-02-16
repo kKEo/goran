@@ -15,3 +15,9 @@ add-token:
 ME?=kkeo
 show-my-tokens:
 	@curl -H "Authorization: $(TOKEN)"  localhost:8080/protected/users/$(ME)/tokens
+
+add-blueprint:
+	@curl -H "Authorization: $(TOKEN)" localhost:8080/protected/blueprints --data '{"name": "my-cluster", "machine": "g6-standard-2", "api_token": "token"}'
+
+get-blueprint:
+	@curl -H "Authorization: $(TOKEN)" localhost:8080/protected/blueprints/my-cluster 

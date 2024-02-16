@@ -29,5 +29,6 @@ func Init() *gorm.DB {
 	}
 	db.AutoMigrate(&model.User{})
 	db.AutoMigrate(&model.ApiToken{})
+	db.AutoMigrate(&model.Blueprint{})
 	return db
 }
