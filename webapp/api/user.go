@@ -29,6 +29,22 @@ func (h *UserHandlers) GetUser(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+func (h *UserHandlers) GetUsers(c *gin.Context) {
+	var users []model.User
+
+	result := h.DB.Find(&users)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Users not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, users)
+}
+
 func (h *UserHandlers) PostUser(c *gin.Context) {
 	var newUser model.User
 	if err := c.BindJSON(&newUser); err != nil {

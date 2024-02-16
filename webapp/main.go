@@ -12,11 +12,8 @@ import (
 
 func SetupApp() *gin.Engine {
 	app := gin.Default()
-
-	log.Println("Init database")
 	database := db.Init()
 
-	log.Println("Database initialized")
 	app.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "Hello, world!",
@@ -29,6 +26,7 @@ func SetupApp() *gin.Engine {
 
 	userApiHandlers := &api.UserHandlers{DB: database}
 	app.GET("/users/:name", userApiHandlers.GetUser)
+	protected.GET("/users", userApiHandlers.GetUsers)
 	protected.POST("/users", userApiHandlers.PostUser)
 
 	tokenApiHandlers := &api.TokenHandlers{DB: database}
