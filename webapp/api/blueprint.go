@@ -8,16 +8,30 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/kkEo/g-mk8s/webapp/model"
+	"log"
 )
 
 type BlueprintHandlers struct {
 	DB *gorm.DB
 }
 
+func (h *BlueprintHandlers) GetNext(c *gin.Context) {
+	var blueprint model.Blueprint
+	result := h.DB.Order("UpdatedAt DESC").Where("status = ?", model.New).First(&blueprint)
+	if result.Error != nil {
+		log.Fatal("Cannot obtain taks to do")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNoContent, nil)
+	}
+	c.JSON(http.StatusOK, blueprint)
+}
+
 func (h *BlueprintHandlers) GetBlueprint(c *gin.Context) {
 
 	name := c.Param("name")
-
 	if name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "The `name` parameter must be none-empty"})
 		return

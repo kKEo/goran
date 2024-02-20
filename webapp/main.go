@@ -41,6 +41,8 @@ func SetupApp() *gin.Engine {
 	protected.PUT("/blueprints", blueprintHandlers.PutBlueprint)
 	protected.GET("/blueprints/:name", blueprintHandlers.GetBlueprint)
 
+	protected.GET("/next", blueprintHandlers.GetNext)
+
 	return app
 }
 
