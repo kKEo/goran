@@ -19,40 +19,32 @@ type Process struct {
 
 func (p *Process) Run() {
 
+	var wait_group sync.WaitGroup
+	wait_group.Add(2)
+
 	log.Printf("Running process: %s", p.Name)
 	p.process = exec.Command(p.Name, p.Args...)
+
+	p.stdoutChannel = make(chan string)
 
 	stdoutPipe, err := p.process.StdoutPipe()
 	if err != nil {
 		panic(err)
 	}
 
-	stderrPipe, err := p.process.StderrPipe()
-	if err != nil {
-		panic(err)
-	}
-
-	if err := p.process.Start(); err != nil {
-		panic(err)
-	}
-
-	var wait_group sync.WaitGroup
-	wait_group.Add(2)
-
-	p.stdoutChannel = make(chan string)
 	go func() {
 		log.Printf("Processing stdout")
 		defer wait_group.Done()
 		reader := bufio.NewReader(stdoutPipe)
 		for {
 			line, err := reader.ReadString('\n')
-			log.Printf("Processing line: %s", line)
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
 				log.Fatalf("Fatal: %s", err)
 			}
+			log.Printf("Processing line: %s", line)
 			p.stdoutChannel <- line
 		}
 		log.Printf("Process done - closing stdout")
@@ -60,6 +52,11 @@ func (p *Process) Run() {
 	}()
 
 	p.stderrChannel = make(chan string)
+	stderrPipe, err := p.process.StderrPipe()
+	if err != nil {
+		panic(err)
+	}
+
 	go func() {
 		defer wait_group.Done()
 		reader := bufio.NewReader(stderrPipe)
@@ -73,18 +70,23 @@ func (p *Process) Run() {
 			}
 			p.stderrChannel <- line
 		}
+		log.Printf("Process done - closing stderr")
 		close(p.stderrChannel)
 	}()
 
+	if err := p.process.Start(); err != nil {
+		panic(err)
+	}
+
 	for line := range p.stdoutChannel {
-		log.Printf("Stdout: %s", line)
+		log.Printf(" -> Consumed: %s", line)
 	}
 
 	for line := range p.stderrChannel {
-		log.Printf("Stderr: %s", line)
+		log.Printf(" -> Consumed: %s", line)
 	}
 
 	log.Printf("Waiting for process to finish")
 	p.process.Wait()
-
+	wait_group.Wait()
 }

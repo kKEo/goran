@@ -17,14 +17,16 @@ type BlueprintHandlers struct {
 
 func (h *BlueprintHandlers) GetNext(c *gin.Context) {
 	var blueprint model.Blueprint
-	result := h.DB.Order("UpdatedAt DESC").Where("status = ?", model.New).First(&blueprint)
-	if result.Error != nil {
-		log.Fatal("Cannot obtain taks to do")
+	result := h.DB.Order("Updated_At DESC").Where("status = ?", model.New).First(&blueprint)
+
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, nil)
+		return
+	} else if result.Error != nil {
+		log.Fatalf("Cannot obtain taks to do: %s", result.Error.Error())
+
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
-	}
-	if result.RowsAffected == 0 {
-		c.JSON(http.StatusNoContent, nil)
 	}
 	c.JSON(http.StatusOK, blueprint)
 }
@@ -66,6 +68,7 @@ func (h *BlueprintHandlers) PostBlueprint(c *gin.Context) {
 		return
 	}
 
+	blueprint.Status = model.New
 	h.DB.Create(&blueprint)
 	c.JSON(http.StatusCreated, blueprint)
 }
