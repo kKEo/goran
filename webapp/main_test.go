@@ -8,11 +8,19 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kkEo/g-mk8s/webapp/db"
+
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCreateUser(t *testing.T) {
-	router := SetupApp()
+
+	config := Config{
+		Database: db.Init(),
+		SkipAuth: true,
+	}
+
+	router := SetupApp(&config)
 
 	var jsonStr = []byte(`{"name": "John", "email": "john@example.com"}`)
 
@@ -33,7 +41,13 @@ func TestCreateUser(t *testing.T) {
 }
 
 func TestCreateNewApiKey(t *testing.T) {
-	router := SetupApp()
+
+	config := Config{
+		Database: db.Init(),
+		SkipAuth: true,
+	}
+
+	router := SetupApp(&config)
 
 	var jsonStr = []byte(`{"name": "t1", "user_name": "John"}`)
 	req, _ := http.NewRequest("POST", "/protected/tokens", bytes.NewBuffer(jsonStr))
@@ -56,7 +70,13 @@ func TestCreateNewApiKey(t *testing.T) {
 }
 
 func TestCreateCustomApiKey(t *testing.T) {
-	router := SetupApp()
+
+	config  := Config{
+		Database: db.Init(),
+		SkipAuth: true,
+	}
+
+	router := SetupApp(&config)
 
 	var jsonStr = []byte(`{"name": "t1", "user_name": "John", "api_key": "johnsapikey"}`)
 	req, _ := http.NewRequest("POST", "/protected/tokens", bytes.NewBuffer(jsonStr))

@@ -4,15 +4,22 @@ import (
 	"log"
 	"net/http"
 
+	"gorm.io/gorm"
 	"github.com/gin-gonic/gin"
 	"github.com/kkEo/g-mk8s/webapp/api"
 	"github.com/kkEo/g-mk8s/webapp/db"
 	"github.com/kkEo/g-mk8s/webapp/middleware"
 )
 
-func SetupApp() *gin.Engine {
+type Config struct {
+	Database *gorm.DB
+	SkipAuth bool
+}
+
+
+func SetupApp(c *Config) *gin.Engine {
 	app := gin.Default()
-	database := db.Init()
+	database := c.Database
 
 	app.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -21,8 +28,12 @@ func SetupApp() *gin.Engine {
 	})
 
 	protected := app.Group("/protected")
-	authMidleware := middleware.AuthMiddleware{DB: database}
-	protected.Use(authMidleware.Handle())
+
+	log.Println("SkipAuth: ", c.SkipAuth)
+	if c.SkipAuth == false {
+		authMidleware := middleware.AuthMiddleware{DB: database}
+		protected.Use(authMidleware.Handle())
+	}
 
 	userApiHandlers := &api.UserHandlers{DB: database}
 	app.GET("/users/:name", userApiHandlers.GetUser)
@@ -47,7 +58,12 @@ func SetupApp() *gin.Engine {
 }
 
 func main() {
-	app := SetupApp()
+	config := Config{
+		Database: db.Init(),
+	}
+
+	app := SetupApp(&config)
+
 	log.Println("Starting server on :8080")
 	app.Run(":8080")
 }
