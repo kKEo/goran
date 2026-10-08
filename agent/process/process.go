@@ -1,92 +1,65 @@
+// Package process runs one child command with stdout and stderr interleaved
+// into a single writer, bounded by a context.
 package process
 
 import (
-	"bufio"
+	"context"
+	"errors"
 	"io"
-	"log"
 	"os/exec"
 	"sync"
+	"time"
 )
 
-type Process struct {
-	Name string
-	Args []string
-
-	process       *exec.Cmd
-	stdoutChannel chan string
-	stderrChannel chan string
+// Spec describes the command to run.
+type Spec struct {
+	Command string
+	Args    []string
+	Dir     string
+	Env     []string
+	// Output receives stdout and stderr in arrival order. nil discards.
+	Output io.Writer
 }
 
-func (p *Process) Run() {
+// lockedWriter serialises the two pipe copiers onto one writer so lines never
+// interleave mid-write.
+type lockedWriter struct {
+	mu sync.Mutex
+	w  io.Writer
+}
 
-	var wait_group sync.WaitGroup
-	wait_group.Add(2)
+func (l *lockedWriter) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.w.Write(p)
+}
 
-	log.Printf("Running process: %s", p.Name)
-	p.process = exec.Command(p.Name, p.Args...)
-
-	p.stdoutChannel = make(chan string)
-
-	stdoutPipe, err := p.process.StdoutPipe()
+// Run starts the command and waits for it. It returns the exit code (−1 when
+// the process was killed or never started). When ctx is done the whole
+// process group is killed so helpers such as terraform providers die too.
+func Run(ctx context.Context, spec Spec) (int, error) {
+	out := spec.Output
+	if out == nil {
+		out = io.Discard
+	}
+	cmd := exec.CommandContext(ctx, spec.Command, spec.Args...)
+	cmd.Dir = spec.Dir
+	cmd.Env = spec.Env
+	w := &lockedWriter{w: out}
+	cmd.Stdout = w
+	cmd.Stderr = w
+	cmd.WaitDelay = 5 * time.Second
+	configure(cmd)
+	if err := cmd.Start(); err != nil {
+		return -1, err
+	}
+	err := cmd.Wait()
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode(), nil
+	}
 	if err != nil {
-		panic(err)
+		return -1, err
 	}
-
-	go func() {
-		log.Printf("Processing stdout")
-		defer wait_group.Done()
-		reader := bufio.NewReader(stdoutPipe)
-		for {
-			line, err := reader.ReadString('\n')
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				log.Fatalf("Fatal: %s", err)
-			}
-			log.Printf("Processing line: %s", line)
-			p.stdoutChannel <- line
-		}
-		log.Printf("Process done - closing stdout")
-		close(p.stdoutChannel)
-	}()
-
-	p.stderrChannel = make(chan string)
-	stderrPipe, err := p.process.StderrPipe()
-	if err != nil {
-		panic(err)
-	}
-
-	go func() {
-		defer wait_group.Done()
-		reader := bufio.NewReader(stderrPipe)
-		for {
-			line, err := reader.ReadString('\n')
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				panic(err)
-			}
-			p.stderrChannel <- line
-		}
-		log.Printf("Process done - closing stderr")
-		close(p.stderrChannel)
-	}()
-
-	if err := p.process.Start(); err != nil {
-		panic(err)
-	}
-
-	for line := range p.stdoutChannel {
-		log.Printf(" -> Consumed: %s", line)
-	}
-
-	for line := range p.stderrChannel {
-		log.Printf(" -> Consumed: %s", line)
-	}
-
-	log.Printf("Waiting for process to finish")
-	p.process.Wait()
-	wait_group.Wait()
+	return 0, nil
 }
