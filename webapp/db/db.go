@@ -1,34 +1,56 @@
+// Package db opens the SQLite database and applies the schema.
 package db
 
 import (
-	"github.com/kkEo/g-mk8s/webapp/model"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	"fmt"
 	"log"
 	"os"
 	"time"
+
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+
+	"github.com/kkEo/g-mk8s/webapp/model"
 )
 
-func Init() *gorm.DB {
+// Options configures Open.
+type Options struct {
+	// Path is the SQLite file. Use ":memory:" for a throwaway database.
+	Path   string
+	LogSQL bool
+}
 
-	newLogger := logger.New(
-		log.New(os.Stdout, "\n", log.LstdFlags), // io writer
-		logger.Config{
-			SlowThreshold: time.Second, // Slow SQL threshold
-			LogLevel:      logger.Info, // Log level
-			Colorful:      true,        // Disable color
-		},
-	)
-
-	db, err := gorm.Open(sqlite.Open("local.sqlite"), &gorm.Config{
-		Logger: newLogger,
-	})
-	if err != nil {
-		log.Fatal("Failed to connect database", err)
+// Open connects, limits the pool to one connection (SQLite has a single
+// writer anyway, and it makes ":memory:" behave) and migrates the schema.
+func Open(opts Options) (*gorm.DB, error) {
+	if opts.Path == "" {
+		opts.Path = "local.sqlite"
 	}
-	db.AutoMigrate(&model.User{})
-	db.AutoMigrate(&model.ApiToken{})
-	db.AutoMigrate(&model.Blueprint{})
-	return db
+	dsn := opts.Path
+	if dsn != ":memory:" {
+		dsn = fmt.Sprintf("%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)", opts.Path)
+	}
+	level := logger.Warn
+	if opts.LogSQL {
+		level = logger.Info
+	}
+	gl := logger.New(log.New(os.Stdout, "", log.LstdFlags), logger.Config{
+		SlowThreshold:             time.Second,
+		LogLevel:                  level,
+		IgnoreRecordNotFoundError: true,
+	})
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{Logger: gl})
+	if err != nil {
+		return nil, fmt.Errorf("open database %s: %w", opts.Path, err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	sqlDB.SetMaxOpenConns(1)
+	if err := db.AutoMigrate(model.All()...); err != nil {
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	return db, nil
 }

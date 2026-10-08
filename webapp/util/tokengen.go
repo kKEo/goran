@@ -1,31 +1,34 @@
+// Package util holds the small cryptographic helpers the server relies on:
+// random tokens, token hashing and the AES-GCM box used for secrets at rest.
 package util
 
 import (
 	"crypto/rand"
-	"encoding/base64"
+	"crypto/sha256"
 	"encoding/hex"
 )
 
-type Encoding int
-
-const (
-	Hex Encoding = iota
-	Base64
-)
-
-func (e Encoding) String() string {
-	return [...]string{"Hex", "Base64"}[e]
-}
-
-func GenerateToken(tokenLength int, encodingType Encoding) (string, error) {
-	b := make([]byte, tokenLength)
-	_, err := rand.Read(b)
-	if err != nil {
+// NewToken returns prefix + 48 hex characters of randomness, for example
+// "gu_3f9a...". Prefixes make it obvious which kind of credential leaked:
+// gu_ user token, ga_ agent key, gr_ registration token.
+func NewToken(prefix string) (string, error) {
+	b := make([]byte, 24)
+	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	if encodingType == Hex {
-		return hex.EncodeToString(b), nil
-	} else {
-		return base64.URLEncoding.EncodeToString(b), nil
+	return prefix + hex.EncodeToString(b), nil
+}
+
+// Hash is the value stored in the database for any token.
+func Hash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+// Prefix is the short, non-secret part shown in listings.
+func Prefix(token string) string {
+	if len(token) > 10 {
+		return token[:10]
 	}
+	return token
 }

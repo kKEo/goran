@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Goran console</title>
+<style>
+  :root { --bg:#f6f7f9; --panel:#fff; --ink:#1c2128; --muted:#636c76; --line:#d8dee4; --accent:#2563eb; --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --wait:#7c3aed; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1319; --panel:#171c24; --ink:#e6edf3; --muted:#8b949e; --line:#2d333b; --accent:#5b9dff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --wait:#b388ff; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; gap:12px; align-items:center; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0 8px 0 0; }
+  input, select, textarea, button { font:inherit; color:inherit; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:6px 8px; }
+  textarea { width:100%; min-height:120px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12.5px; }
+  button { cursor:pointer; background:var(--panel); }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.danger { color:var(--bad); }
+  button:disabled { opacity:.5; cursor:default; }
+  nav { display:flex; gap:4px; padding:8px 16px 0; }
+  nav button { border-bottom:none; border-radius:6px 6px 0 0; }
+  nav button.active { background:var(--panel); font-weight:600; }
+  main { padding:16px; display:grid; gap:16px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 1100px) { main.split { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); } }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; min-width:0; }
+  .panel h2 { margin:0 0 10px; font-size:15px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.03em; }
+  tr.row { cursor:pointer; }
+  tr.row:hover, tr.selected { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .badge { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid currentColor; }
+  .s-new, .s-pending { color:var(--muted); } .s-running { color:var(--accent); } .s-done { color:var(--ok); }
+  .s-error { color:var(--bad); } .s-awaiting_approval, .s-approved { color:var(--wait); } .s-rejected, .s-canceled { color:var(--warn); }
+  pre { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:10px; max-height:480px; overflow:auto; font-size:12.5px; white-space:pre-wrap; word-break:break-word; margin:0; }
+  .grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px 16px; }
+  .grid label, .form label { display:block; color:var(--muted); font-size:12px; margin-bottom:2px; }
+  .form > div { margin-bottom:10px; }
+  .form input, .form select { width:100%; }
+  .muted { color:var(--muted); }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .toast { position:fixed; bottom:16px; right:16px; background:var(--bad); color:#fff; padding:10px 14px; border-radius:8px; max-width:420px; display:none; }
+  .toast.ok { background:var(--ok); }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12.5px; }
+  .once { background:var(--bg); border:1px dashed var(--line); padding:10px; border-radius:6px; margin-top:10px; word-break:break-all; }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Goran</h1>
+  <input id="token" type="password" placeholder="API token (gu_…)" size="34" autocomplete="off">
+  <button id="connect" class="primary">Connect</button>
+  <select id="workspace" title="Workspace"></select>
+  <span id="whoami" class="muted"></span>
+  <label style="margin-left:auto"><input type="checkbox" id="auto" checked> auto-refresh</label>
+</header>
+<nav>
+  <button data-view="tasks" class="active">Tasks</button>
+  <button data-view="agents">Agents</button>
+  <button data-view="secrets">Secrets</button>
+  <button data-view="members">Members</button>
+</nav>
+
+<main id="view-tasks" class="split">
+  <section class="panel">
+    <h2>Tasks <span><select id="filter"><option value="">all statuses</option><option value="new,pending,running,awaiting_approval,approved">active</option><option value="awaiting_approval">awaiting approval</option><option value="done">done</option><option value="error">error</option></select> <button id="new-task">New task</button></span></h2>
+    <table><thead><tr><th>#</th><th>Name</th><th>Kind</th><th>Status</th><th>Agent</th><th>Att.</th><th>Updated</th></tr></thead><tbody id="tasks"></tbody></table>
+  </section>
+  <section class="panel" id="detail-panel">
+    <div id="task-form" class="form hidden">
+      <h2>New task</h2>
+      <div><label>Name</label><input id="f-name" placeholder="deploy client vpc"></div>
+      <div><label>Kind</label><select id="f-kind"><option value="shell">shell</option><option value="terraform">terraform</option><option value="ansible">ansible</option></select></div>
+      <div><label>Params (JSON)</label><textarea id="f-params"></textarea></div>
+      <div class="grid">
+        <div><label>Required agent labels (comma separated)</label><input id="f-labels" placeholder="eu, client-a"></div>
+        <div><label>Timeout seconds</label><input id="f-timeout" type="number" placeholder="3600"></div>
+      </div>
+      <div><label>Secrets: env var → secret name (JSON)</label><textarea id="f-secrets" style="min-height:60px">{}</textarea></div>
+      <div class="actions"><button id="f-submit" class="primary">Queue task</button><button id="f-cancel">Close</button></div>
+    </div>
+    <div id="task-detail"><p class="muted">Select a task to see its details and log.</p></div>
+  </section>
+</main>
+
+<main id="view-agents" class="hidden">
+  <section class="panel">
+    <h2>Agents <span><input id="reg-ttl" type="number" value="60" style="width:80px" title="token lifetime in minutes"> min <button id="new-reg">New registration token</button></span></h2>
+    <div id="reg-once" class="once hidden"></div>
+    <table><thead><tr><th>#</th><th>Name</th><th>Labels</th><th>Key</th><th>Last seen</th><th></th></tr></thead><tbody id="agents"></tbody></table>
+  </section>
+</main>
+
+<main id="view-secrets" class="hidden">
+  <section class="panel">
+    <h2>Secrets <span class="muted">values are encrypted at rest and only ever handed to the agent running a task</span></h2>
+    <div class="actions"><input id="sec-name" placeholder="name (e.g. linode-token)"><input id="sec-value" type="password" placeholder="value" size="40"><button id="sec-save" class="primary">Save</button></div>
+    <table><thead><tr><th>Name</th><th>Updated</th><th></th></tr></thead><tbody id="secrets"></tbody></table>
+  </section>
+</main>
+
+<main id="view-members" class="hidden">
+  <section class="panel">
+    <h2>Members</h2>
+    <div class="actions"><input id="mem-user" placeholder="user name"><select id="mem-role"><option value="member">member</option><option value="admin">admin</option></select><button id="mem-add" class="primary">Add / update</button></div>
+    <table><thead><tr><th>User</th><th>Email</th><th>Role</th></tr></thead><tbody id="members"></tbody></table>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const state = { token: localStorage.getItem('goran.token') || '', ws: localStorage.getItem('goran.ws') || '', view: 'tasks', selected: null, tasks: [], agents: [], me: null, timer: null };
+  const TEMPLATES = {
+    shell: { script: "echo hello from $(hostname)" },
+    terraform: { source: { git: "https://github.com/org/infra.git", ref: "main", path: "envs/client-a" }, vars: { region: "eu-central" }, auto_approve: false },
+    ansible: { source: { git: "https://github.com/org/playbooks.git", ref: "main" }, playbook: "site.yml", inventory: "inventory/prod.ini", extra_vars: {} },
+  };
+
+  function toast(msg, ok) {
+    const t = $('toast'); t.textContent = msg; t.className = 'toast' + (ok ? ' ok' : ''); t.style.display = 'block';
+    clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ok ? 2500 : 6000);
+  }
+  async function api(method, path, body) {
+    const headers = { 'Authorization': 'Bearer ' + state.token };
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const r = await fetch(path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    const text = await r.text();
+    let data = text; try { data = JSON.parse(text); } catch (e) {}
+    if (!r.ok) throw new Error((data && data.error) || (r.status + ' ' + r.statusText));
+    return data;
+  }
+  const wsPath = (s) => '/api/workspaces/' + encodeURIComponent(state.ws) + s;
+  const fmt = (d) => d ? new Date(d).toLocaleString() : '';
+  const ago = (d) => { if (!d) return 'never'; const s = Math.round((Date.now() - new Date(d)) / 1000); return s < 60 ? s + 's ago' : s < 3600 ? Math.round(s / 60) + 'm ago' : fmt(d); };
+  const badge = (s) => `<span class="badge s-${esc(s)}">${esc(s)}</span>`;
+  const agentName = (id) => { const a = state.agents.find(a => a.id === id); return a ? a.name : (id ? '#' + id : ''); };
+
+  async function connect() {
+    state.token = $('token').value.trim(); localStorage.setItem('goran.token', state.token);
+    try {
+      state.me = await api('GET', '/api/me');
+      $('whoami').textContent = state.me.user.name + (state.me.user.admin ? ' (admin)' : '');
+      const wss = await api('GET', '/api/workspaces');
+      const sel = $('workspace'); sel.innerHTML = wss.map(w => `<option value="${esc(w.name)}">${esc(w.name)}</option>`).join('');
+      if (!wss.length) { toast('You are not a member of any workspace yet'); return; }
+      if (!wss.some(w => w.name === state.ws)) state.ws = wss[0].name;
+      sel.value = state.ws; localStorage.setItem('goran.ws', state.ws);
+      toast('Connected', true); refresh();
+    } catch (e) { toast('Cannot connect: ' + e.message); }
+  }
+
+  async function refresh() {
+    if (!state.token || !state.ws) return;
+    try {
+      if (state.view === 'tasks') {
+        const [tasks, agents] = await Promise.all([api('GET', wsPath('/tasks' + ($('filter').value ? '?status=' + $('filter').value : ''))), api('GET', wsPath('/agents'))]);
+        state.tasks = tasks; state.agents = agents; renderTasks();
+        if (state.selected) await renderDetail(state.selected);
+      } else if (state.view === 'agents') { state.agents = await api('GET', wsPath('/agents')); renderAgents(); }
+      else if (state.view === 'secrets') renderSecrets(await api('GET', wsPath('/secrets')));
+      else if (state.view === 'members') renderMembers(await api('GET', wsPath('/members')));
+    } catch (e) { toast(e.message); }
+  }
+
+  function renderTasks() {
+    $('tasks').innerHTML = state.tasks.map(t => `<tr class="row ${t.id === state.selected ? 'selected' : ''}" data-id="${t.id}">
+      <td>${t.id}</td><td>${esc(t.name)}</td><td>${esc(t.kind)}${t.phase ? ' <span class="muted">/' + esc(t.phase) + '</span>' : ''}</td>
+      <td>${badge(t.status)}</td><td>${esc(agentName(t.agent_id))}</td><td>${t.attempts}/${t.max_attempts}</td><td class="muted">${ago(t.updated_at)}</td></tr>`).join('')
+      || '<tr><td colspan="7" class="muted">No tasks yet.</td></tr>';
+    document.querySelectorAll('#tasks tr.row').forEach(tr => tr.onclick = () => { state.selected = +tr.dataset.id; $('task-form').classList.add('hidden'); renderTasks(); renderDetail(state.selected); });
+  }
+
+  async function renderDetail(id) {
+    let t, log;
+    try { [t, log] = await Promise.all([api('GET', wsPath('/tasks/' + id)), api('GET', wsPath('/tasks/' + id + '/log'))]); }
+    catch (e) { $('task-detail').innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+    const can = (...s) => s.includes(t.status);
+    const admin = state.me && (state.me.user.admin || state.me.memberships.some(m => m.role === 'admin'));
+    $('task-detail').innerHTML = `
+      <h2>#${t.id} ${esc(t.name)} ${badge(t.status)}</h2>
+      <div class="actions">
+        ${can('awaiting_approval') && admin ? '<button class="primary" data-act="approve">Approve &amp; apply</button><button class="danger" data-act="reject">Reject</button>' : ''}
+        ${can('new', 'awaiting_approval') ? '<button data-act="cancel">Cancel</button>' : ''}
+        <button data-act="refresh">Refresh</button>
+      </div>
+      <div class="grid">
+        <div><label>Kind / phase</label>${esc(t.kind)} ${t.phase ? '/ ' + esc(t.phase) : ''}</div>
+        <div><label>Agent</label>${esc(agentName(t.agent_id)) || '<span class="muted">unassigned</span>'}</div>
+        <div><label>Attempts</label>${t.attempts} of ${t.max_attempts}</div>
+        <div><label>Timeout</label>${t.timeout_seconds}s</div>
+        <div><label>Labels</label>${(t.labels || []).map(esc).join(', ') || '<span class="muted">none</span>'}</div>
+        <div><label>Secrets</label>${Object.keys(t.secrets || {}).map(k => esc(k) + ' ← ' + esc(t.secrets[k])).join('<br>') || '<span class="muted">none</span>'}</div>
+        <div><label>Created</label>${fmt(t.created_at)}</div>
+        <div><label>Started / finished</label>${fmt(t.started_at) || '–'} / ${fmt(t.finished_at) || '–'}</div>
+        ${t.lease_expires_at ? `<div><label>Lease expires</label>${fmt(t.lease_expires_at)}</div>` : ''}
+        ${t.exit_code !== null && t.exit_code !== undefined ? `<div><label>Exit code</label>${t.exit_code}</div>` : ''}
+        ${t.error ? `<div style="grid-column:1/-1"><label>Error</label><span class="s-error">${esc(t.error)}</span></div>` : ''}
+      </div>
+      <p><label class="muted">Params</label><pre>${esc(JSON.stringify(t.params, null, 2))}</pre></p>
+      <p><label class="muted">Log</label><pre id="log">${esc(log) || '<span class="muted">no output yet</span>'}</pre></p>`;
+    document.querySelectorAll('#task-detail [data-act]').forEach(b => b.onclick = async () => {
+      const act = b.dataset.act;
+      if (act === 'refresh') return refresh();
+      try { await api('POST', wsPath('/tasks/' + id + '/' + act)); toast(act + ' ok', true); refresh(); } catch (e) { toast(e.message); }
+    });
+    const pre = $('log'); if (pre) pre.scrollTop = pre.scrollHeight;
+  }
+
+  function renderAgents() {
+    $('agents').innerHTML = state.agents.map(a => `<tr><td>${a.id}</td><td>${esc(a.name)}</td><td>${(a.labels || []).map(esc).join(', ')}</td><td><code>${esc(a.key_prefix)}…</code></td><td>${ago(a.last_seen_at)}</td>
+      <td><button class="danger" data-del="${a.id}">Revoke</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">No agents registered. Create a registration token and run <code>goran-agent register</code>.</td></tr>';
+    document.querySelectorAll('#agents [data-del]').forEach(b => b.onclick = () => armed(b, async () => { await api('DELETE', wsPath('/agents/' + b.dataset.del)); refresh(); }));
+  }
+  function renderSecrets(list) {
+    $('secrets').innerHTML = list.map(s => `<tr><td><code>${esc(s.name)}</code></td><td class="muted">${fmt(s.updated_at)}</td><td><button class="danger" data-del="${esc(s.name)}">Delete</button></td></tr>`).join('') || '<tr><td colspan="3" class="muted">No secrets.</td></tr>';
+    document.querySelectorAll('#secrets [data-del]').forEach(b => b.onclick = () => armed(b, async () => { await api('DELETE', wsPath('/secrets/' + encodeURIComponent(b.dataset.del))); refresh(); }));
+  }
+  function renderMembers(list) {
+    $('members').innerHTML = list.map(m => `<tr><td>${esc(m.name)}</td><td class="muted">${esc(m.email)}</td><td>${esc(m.role)}</td></tr>`).join('');
+  }
+  // Two-click confirmation without a blocking dialog.
+  function armed(btn, fn) {
+    if (btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = '…'; fn().catch(e => toast(e.message)); return; }
+    btn.dataset.armed = '1'; const old = btn.textContent; btn.textContent = 'Sure?';
+    setTimeout(() => { delete btn.dataset.armed; btn.textContent = old; }, 3000);
+  }
+
+  // wiring
+  $('token').value = state.token;
+  $('connect').onclick = connect;
+  $('token').addEventListener('keydown', e => { if (e.key === 'Enter') connect(); });
+  $('workspace').onchange = () => { state.ws = $('workspace').value; localStorage.setItem('goran.ws', state.ws); state.selected = null; $('task-detail').innerHTML = ''; refresh(); };
+  $('filter').onchange = refresh;
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
+    state.view = b.dataset.view;
+    ['tasks', 'agents', 'secrets', 'members'].forEach(v => $('view-' + v).classList.toggle('hidden', v !== state.view));
+    refresh();
+  });
+  $('new-task').onclick = () => { $('task-form').classList.remove('hidden'); state.selected = null; renderTasks(); $('task-detail').innerHTML = ''; $('f-params').value = JSON.stringify(TEMPLATES[$('f-kind').value], null, 2); };
+  $('f-kind').onchange = () => $('f-params').value = JSON.stringify(TEMPLATES[$('f-kind').value], null, 2);
+  $('f-cancel').onclick = () => $('task-form').classList.add('hidden');
+  $('f-submit').onclick = async () => {
+    try {
+      const body = { name: $('f-name').value.trim(), kind: $('f-kind').value, params: JSON.parse($('f-params').value || '{}'),
+        labels: $('f-labels').value.split(',').map(s => s.trim()).filter(Boolean), secrets: JSON.parse($('f-secrets').value || '{}') };
+      if ($('f-timeout').value) body.timeout_seconds = +$('f-timeout').value;
+      const t = await api('POST', wsPath('/tasks'), body);
+      toast('Task #' + t.id + ' queued', true); $('task-form').classList.add('hidden'); state.selected = t.id; refresh();
+    } catch (e) { toast(e.message); }
+  };
+  $('new-reg').onclick = async () => {
+    try {
+      const r = await api('POST', wsPath('/registration-tokens'), { ttl_minutes: +$('reg-ttl').value || 60 });
+      $('reg-once').classList.remove('hidden');
+      $('reg-once').innerHTML = `<b>One-time registration token</b> (valid until ${fmt(r.expires_at)}; shown once):<br><code>${esc(r.token)}</code><br><br>On the agent host:<br><code>goran-agent register --server ${esc(location.origin)} --token ${esc(r.token)} --name &lt;agent-name&gt; --labels &lt;a,b&gt;</code><br><code>goran-agent run</code>`;
+    } catch (e) { toast(e.message); }
+  };
+  $('sec-save').onclick = async () => {
+    try { await api('PUT', wsPath('/secrets/' + encodeURIComponent($('sec-name').value.trim())), { value: $('sec-value').value }); $('sec-value').value = ''; toast('Secret saved', true); refresh(); } catch (e) { toast(e.message); }
+  };
+  $('mem-add').onclick = async () => {
+    try { await api('POST', wsPath('/members'), { user: $('mem-user').value.trim(), role: $('mem-role').value }); toast('Member saved', true); refresh(); } catch (e) { toast(e.message); }
+  };
+  setInterval(() => { if ($('auto').checked && state.view === 'tasks') refresh(); }, 3000);
+  if (state.token) connect();
+})();
+</script>
+</body>
+</html>
