@@ -39,6 +39,9 @@ func (w *Worker) Run(ctx context.Context) error {
 	if w.Poll <= 0 {
 		w.Poll = 2 * time.Second
 	}
+	if abs, err := filepath.Abs(w.WorkDir); err == nil {
+		w.WorkDir = abs
+	}
 	w.logf("polling %s every %s, workdir %s", w.Client.BaseURL, w.Poll, w.WorkDir)
 	for {
 		handled, err := w.RunOnce(ctx)
@@ -132,7 +135,13 @@ func (w *Worker) execute(parent context.Context, task *wire.AgentTask) {
 		}
 	}()
 
+	// Child processes run inside the source checkout, not in the agent's
+	// directory, so every path handed to them must be absolute even when
+	// WorkDir is relative (the default "work").
 	taskDir := filepath.Join(w.WorkDir, strconv.FormatUint(uint64(task.ID), 10))
+	if abs, err := filepath.Abs(taskDir); err == nil {
+		taskDir = abs
+	}
 	var outcome runner.Outcome
 	err := os.MkdirAll(taskDir, 0o755)
 	if err == nil {

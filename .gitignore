@@ -11,3 +11,6 @@ bin/
 agent/agent
 webapp/webapp
 *.test
+
+# documentation build output
+site/

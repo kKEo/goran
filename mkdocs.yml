@@ -1,0 +1,124 @@
+site_name: Goran
+site_description: Self-hosted runner for Terraform, Ansible and shell tasks, executed by agents inside your clients' networks.
+site_url: https://kkeo.github.io/goran/
+repo_url: https://github.com/kKEo/goran
+repo_name: kKEo/goran
+edit_uri: edit/master/docs/
+copyright: Goran documentation. Built with MkDocs and Material for MkDocs.
+
+theme:
+  name: material
+  language: en
+  icon:
+    logo: material/transit-connection-variant
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - toc.follow
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/kKEo/goran
+
+# Fail the build on anything suspicious: `mkdocs build --strict` turns these into errors.
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Overview: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Quick start: getting-started/quickstart.md
+      - First Terraform task: getting-started/first-terraform-task.md
+  - Concepts:
+      - Architecture: concepts/architecture.md
+      - Task lifecycle: concepts/task-lifecycle.md
+      - Labels and routing: concepts/labels-and-routing.md
+      - Workspaces and access: concepts/workspaces-and-access.md
+      - Security model: concepts/security.md
+  - Tasks:
+      - Task anatomy: tasks/index.md
+      - Shell: tasks/shell.md
+      - Terraform: tasks/terraform.md
+      - Ansible: tasks/ansible.md
+  - Server:
+      - CLI reference: server/cli.md
+      - Configuration: server/configuration.md
+      - Deployment: server/deployment.md
+      - Web console: server/console.md
+  - Agent:
+      - CLI reference: agent/cli.md
+      - Configuration: agent/configuration.md
+      - Deployment: agent/deployment.md
+      - Execution model: agent/execution.md
+  - API:
+      - Overview: api/index.md
+      - Users and tokens: api/users-and-tokens.md
+      - Workspaces and members: api/workspaces.md
+      - Secrets: api/secrets.md
+      - Agents and registration: api/agents.md
+      - Tasks: api/tasks.md
+      - Agent protocol: api/agent-protocol.md
+  - Operations:
+      - Troubleshooting: operations/troubleshooting.md
+      - Upgrading and backups: operations/upgrading.md
+      - Known limitations: operations/limitations.md
+  - Development:
+      - Building and testing: development/building.md
+      - Repository layout: development/layout.md
+      - Extending Goran: development/extending.md
+      - Working on the docs: development/docs.md

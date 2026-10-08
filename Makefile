@@ -2,7 +2,7 @@ BIN      ?= bin
 SERVER   ?= http://localhost:8080
 GOFLAGS  := -trimpath -ldflags="-s -w"
 
-.PHONY: build test vet fmt keygen bootstrap serve agent-register agent-run docker clean
+.PHONY: build test vet fmt keygen bootstrap serve agent-register agent-run docker docs docs-serve clean
 
 build:
 	mkdir -p $(BIN)
@@ -43,5 +43,13 @@ docker:
 	docker build -f build/Dockerfile.server -t goran-server .
 	docker build -f build/Dockerfile.agent -t goran-agent .
 
+## documentation ---------------------------------------------------------------
+
+docs:              ## strict build into site/ (pip install -r docs/requirements.txt first)
+	mkdocs build --strict
+
+docs-serve:        ## live preview at http://127.0.0.1:8000
+	mkdocs serve
+
 clean:
-	rm -rf $(BIN) work
+	rm -rf $(BIN) work site

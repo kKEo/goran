@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -192,4 +193,45 @@ func readFile(t *testing.T, path string) string {
 	b, err := os.ReadFile(path)
 	require.NoError(t, err)
 	return string(b)
+}
+
+// The default work directory is relative ("work"). Child processes run inside
+// the source checkout, so every path the agent hands them must be absolute or
+// git clones and plan files land in the wrong place.
+func TestRelativeWorkDirWithGitSource(t *testing.T) {
+	s := newStack(t)
+	old, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(t.TempDir()))
+	t.Cleanup(func() { _ = os.Chdir(old) })
+	s.worker.WorkDir = "work"
+
+	repo := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "main.tf"), []byte("# nothing to see\n"), 0o644))
+	for _, args := range [][]string{
+		{"init", "-q"}, {"add", "."},
+		{"-c", "user.email=e2e@example.com", "-c", "user.name=e2e", "commit", "-q", "-m", "init"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = repo
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, string(out))
+	}
+	bin := t.TempDir()
+	fake := "#!/bin/sh\nfor a in \"$@\"; do case $a in -out=*) : > \"${a#-out=}\";; esac; done\n"
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "terraform"), []byte(fake), 0o755))
+
+	id := s.call("POST", "/api/workspaces/acme/tasks", map[string]interface{}{
+		"name": "clone", "kind": "terraform",
+		"params": map[string]interface{}{
+			"source": map[string]string{"git": repo}, "binary": filepath.Join(bin, "terraform"), "auto_approve": true,
+		},
+	})["id"].(float64)
+	handled, err := s.worker.RunOnce(context.Background())
+	require.NoError(t, err)
+	require.True(t, handled)
+	tk := s.task(id)
+	assert.Equal(t, model.StatusDone, tk.Status, "task error: %s", tk.Error)
+	_, err = os.Stat("work")
+	assert.NoError(t, err, "the work directory is created relative to the agent's directory")
 }

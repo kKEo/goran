@@ -11,6 +11,9 @@ It is the engine that products like Spacelift private workers or Pulumi
 customer-managed runners sell on enterprise tiers, as two static Go binaries
 and one SQLite file.
 
+**Documentation:** <https://kkeo.github.io/goran/> (sources in `docs/`, built with MkDocs;
+`make docs-serve` for a local preview).
+
 ```
 ┌────────────┐  Bearer gu_…   ┌─────────────────────┐  Bearer ga_…  ┌─────────────┐
 │ console /  │ ─────────────▶ │ goran-server        │ ◀──────────── │ goran-agent │
@@ -26,7 +29,7 @@ and one SQLite file.
 make build                                  # bin/goran-server, bin/goran-agent
 
 # 1. one-time server setup
-export $(bin/goran-server keygen)            # GORAN_MASTER_KEY=… (keep it; it encrypts secrets at rest)
+eval "$(bin/goran-server keygen)"           # GORAN_MASTER_KEY=… (keep it; it encrypts secrets at rest)
 bin/goran-server bootstrap --user admin --workspace client-a
 #   prints: token: gu_…
 export GORAN_TOKEN=gu_…
@@ -163,6 +166,7 @@ POST   /agent/tasks/:id/result                      {status, exit_code, error}
 make test       # unit tests, API tests and an in-process end-to-end run
 make vet fmt
 make docker     # build/Dockerfile.server and build/Dockerfile.agent
+make docs       # documentation site (pip install -r docs/requirements.txt first)
 ```
 
 The agent image ships git, bash, Terraform and Ansible; pass
