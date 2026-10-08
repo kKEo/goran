@@ -1,1 +1,13 @@
+# databases and local state
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 local.sqlite
+agent.json
+work/
+bin/
+
+# build artifacts (the agent binary used to be committed by mistake)
+agent/agent
+webapp/webapp
+*.test
